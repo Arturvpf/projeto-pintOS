@@ -76,6 +76,48 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+// static float_type load_media;
+
+// bool sort_priority_list_less_func(const struct list_elem *a, 
+//                                   const struct list_elem *b, void *aux)
+// {
+//   int64_t priority_a = list_entry(a, struct thread, elem)->priority;
+//   int64_t priority_b = list_entry(b, struct thread, elem)->priority;
+//   return priority_a > priority_b; 
+// }
+
+// bool sort_priority_list_after_func(const struct list_elem *a, 
+//                                   const struct list_elem *b, void *aux)
+// {
+//   int64_t priority_a = list_entry(a, struct thread, elem)->priority;
+//   int64_t priority_b = list_entry(b, struct thread, elem)->priority;
+//   return priority_a >= priority_b;
+// }
+// void increment_recent_cpu(struct thread* t)
+// {
+//   if(t!= idle_thread)
+//   {
+//     float_type increment = FLOAT_ADD_MIX(0,1);
+//     t->recent_cpu = t->recent_cpu + increment;
+//   }
+// }
+// void update_recent_cpu(struct thread* t, void *aux)
+// {
+//   t->recent_cpu =  FLOAT_MULT_MIX(FLOAT_DIV_MIX(2* load_media, 2*load_media + FLOAT_ADD_MIX(0,1)),t->recent_cpu) + FLOAT_ADD_MIX(0,t->nice);
+// }
+// void update_recent_cpu_and_priority(struct thread* t, void * aux)
+// {
+//   update_recent_cpu(t, aux);
+//   t->priority = 63 - FLOAT_ROUND(t->recent_cpu/4) - (t->nice/2);
+//   if(t->priority > 63) t->priority = 63;
+//   else if (t->priority < 0) t->priority = 0;
+// }
+
+// void sort_ready_list()
+// {
+//   list_sort(&ready_list, sort_priority_list_less_func, NULL);
+// }
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -321,63 +363,61 @@ thread_yield (void)
   schedule ();
   intr_set_level (old_level);
 }
+//Adicionadas:
 /*
   logica de comparacao ordenada
 */
-
-static bool ordenado (const struct list_elem *aa, const struct list_elem *bb, void *aux) {
-  ASSERT (aa != NULL);
-  ASSERT (bb != NULL);
-  struct thread *a = list_entry (aa, struct thread, elem);
-  struct thread *b = list_entry (bb, struct thread, elem);
-  return a->time_to_wake < b->time_to_wake;
+static bool ordenado (const struct list_elem *a, const struct list_elem *b, void *aux) {
+  ASSERT (a != NULL);
+  ASSERT (b != NULL);
+  struct thread *thread_a = list_entry (a, struct thread, elem);
+  struct thread *thread_b = list_entry (b, struct thread, elem);
+  return thread_a->time_to_wake < thread_b->time_to_wake;
 }
-/* poe as threads para dormir */
+/* 
+  Adicionada: Funcao poe as threads para dormir 
+*/
 void
 thread_sleep(int64_t ticks)
 {
-  if (ticks <= 0)
-    return;
+  if (ticks <= 0) return;
 
   struct thread *cur = thread_current ();
   enum intr_level old_level = intr_disable ();
   cur->time_to_wake = ticks;
 
-  list_insert_ordered(&sleep_list, &cur->elem, ordenado, NULL);
+  list_insert_ordered(&sleep_list, &cur->elem, ordenado, NULL); //insere ordenadamente na lista de dormir
   thread_block();
   intr_set_level (old_level);
   
 }
-
 /*
-  Adicionada : Wake up threads
+  Adicionada: acorda as threads
 */
 void
 thread_wakeup(void)
 {
   struct thread *t;
-  struct list_elem *cur = list_begin (&sleep_list), *next;
+  struct list_elem *cur_elem = list_begin (&sleep_list), *next_elem;
 
-   if (list_empty (&sleep_list))
-     return;
+  if (list_empty (&sleep_list)) return;
 
-   while (cur != list_end (&sleep_list))
-     {
-       next = list_next (cur);
-       t = list_entry (cur, struct thread, elem);
-      if (t->time_to_wake > timer_ticks())
-         break;
+  while (cur_elem != list_end (&sleep_list))
+  {
+    next_elem = list_next (cur_elem);
+    t = list_entry (cur_elem, struct thread, elem);
+    if (t->time_to_wake > timer_ticks()) break; // sem threads para acordar
 
-       // Remove the thread from timer_wait_list
-       // then unblock it
-       enum intr_level old_level;
-       old_level = intr_disable ();
-      list_remove (cur);
-             thread_unblock (t);
-       intr_set_level (old_level);
-       cur = next;
-     }
+    // Remove a thread da lista de sleep e desbloqueia
+    enum intr_level old_level;
+    old_level = intr_disable ();
+    list_remove (cur_elem);
+    thread_unblock (t);
+    intr_set_level (old_level);
+    cur_elem = next_elem;
+  }
 }
+//Fim das adicoes
 
 /* Invoke function 'func' on alSl threads, passing along 'aux'.
    This function must be called with interrupts off. */
