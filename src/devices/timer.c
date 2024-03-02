@@ -7,6 +7,7 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include "lib/kernel/list.h"
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -175,6 +176,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+  thread_wakeup (ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

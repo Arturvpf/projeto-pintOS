@@ -52,7 +52,7 @@ struct kernel_thread_frame
 static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
-static long long tick_global;   /* # of timer ticks since OS booted. */
+
 
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
@@ -74,7 +74,7 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
-
+bool ordenador(const struct list_elem *a, const struct list_elem *b, void *aux);
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -96,7 +96,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  list_init(&sleep_list); /* Inicializa a lista de threads para dormir */
+  list_init (&sleep_list); /* Inicializa a lista de threads para dormir */
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -303,7 +303,7 @@ thread_exit (void)
 
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
-/*void
+void
 thread_yield (void) 
 {
   struct thread *cur = thread_current ();
@@ -317,26 +317,63 @@ thread_yield (void)
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
-}*/
+}
+/*
+  Puts threads to sleep
+*/
 
 void
 thread_sleep(int64_t ticks)
 {
   struct thread *t = thread_current();
   enum intr_level old_level;
+
   ASSERT (!intr_context ());
-  
+  old_level = intr_disable();
+
   if(t!=idle_thread){
-    old_level = intr_disable();
-    list_push_back(&sleep_list, &t->elem);
     t->time_to_wake = ticks;
+    list_insert_ordered(&sleep_list, &t->elem, ordenador, NULL);
     thread_block();
     intr_set_level(old_level);    
   }
-  
 }
 
-/* Invoke function 'func' on all threads, passing along 'aux'.
+/*
+  Wake up threads
+*/
+void
+thread_wakeup(int64_t ticks)
+{
+  struct list_elem *e;
+  struct thread *t;
+  enum intr_level old_level;
+
+  ASSERT (!intr_context ());
+  old_level = intr_disable();
+
+  for(e = list_begin(&sleep_list); e != list_end(&sleep_list); ){
+    t = list_entry(e, struct thread, elem);
+    if(t->time_to_wake <= ticks){
+      e = list_next(e);
+      list_remove(e->prev);
+      thread_unblock(t);
+    } else break; // n haverá mais threads para acordar
+  }
+  intr_set_level(old_level);
+}
+
+bool ordenador(const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+
+  struct thread *thread1 = list_entry(a, struct thread, elem);
+  struct thread *thread2 = list_entry(b, struct thread, elem);
+
+  return thread1->time_to_wake < thread2->time_to_wake;
+
+}
+
+/* Invoke function 'func' on alSl threads, passing along 'aux'.
    This function must be called with interrupts off. */
 void
 thread_foreach (thread_action_func *func, void *aux)
