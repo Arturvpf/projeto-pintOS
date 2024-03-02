@@ -1,4 +1,7 @@
 {
     "editor.formatOnSave": true,
     "C_Cpp.formatting": "clangFormat",
+    "files.associations": {
+        "palloc.h": "c"
+    },
 }

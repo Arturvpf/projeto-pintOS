@@ -25,6 +25,7 @@ static int64_t ticks;
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
 //
+
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
@@ -94,10 +95,10 @@ timer_sleep (int64_t ticks)
 
   ASSERT (intr_get_level () == INTR_ON);
   /*while (timer_elapsed (start) < ticks) 
-    thread_yield ();*/
-  if(timer_elapsed(start) < ticks){
-    thread_sleep((start+ticks));
-  }
+    thread_yield (); */
+ if(timer_elapsed(start)<ticks)
+    thread_sleep((start+ticks)); //substituida por thread sleep
+
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -131,6 +132,8 @@ timer_nsleep (int64_t ns)
    interrupts off for the interval between timer ticks or longer
    will cause timer ticks to be lost.  Thus, use timer_msleep()
    instead if interrupts are enabled. */
+
+
 void
 timer_mdelay (int64_t ms) 
 {
@@ -175,8 +178,8 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_tick ();
-  thread_wakeup (ticks);
+  thread_tick (); 
+  thread_wakeup (); //adicionada funcao wakeup
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

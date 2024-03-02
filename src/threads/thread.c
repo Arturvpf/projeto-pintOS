@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "threads/flags.h"
+#include "devices/timer.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
@@ -74,7 +75,7 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
-bool ordenador(const struct list_elem *a, const struct list_elem *b, void *aux);
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -88,6 +89,8 @@ bool ordenador(const struct list_elem *a, const struct list_elem *b, void *aux);
 
    It is not safe to call thread_current() until this function
    finishes. */
+
+   
 void
 thread_init (void) 
 {
@@ -319,58 +322,61 @@ thread_yield (void)
   intr_set_level (old_level);
 }
 /*
-  Puts threads to sleep
+  logica de comparacao ordenada
 */
 
+static bool ordenado (const struct list_elem *aa, const struct list_elem *bb, void *aux) {
+  ASSERT (aa != NULL);
+  ASSERT (bb != NULL);
+  struct thread *a = list_entry (aa, struct thread, elem);
+  struct thread *b = list_entry (bb, struct thread, elem);
+  return a->time_to_wake < b->time_to_wake;
+}
+/* poe as threads para dormir */
 void
 thread_sleep(int64_t ticks)
 {
-  struct thread *t = thread_current();
-  enum intr_level old_level;
+  if (ticks <= 0)
+    return;
 
-  ASSERT (!intr_context ());
-  old_level = intr_disable();
+  struct thread *cur = thread_current ();
+  enum intr_level old_level = intr_disable ();
+  cur->time_to_wake = ticks;
 
-  if(t!=idle_thread){
-    t->time_to_wake = ticks;
-    list_insert_ordered(&sleep_list, &t->elem, ordenador, NULL);
-    thread_block();
-    intr_set_level(old_level);    
-  }
+  list_insert_ordered(&sleep_list, &cur->elem, ordenado, NULL);
+  thread_block();
+  intr_set_level (old_level);
+  
 }
 
 /*
-  Wake up threads
+  Adicionada : Wake up threads
 */
 void
-thread_wakeup(int64_t ticks)
+thread_wakeup(void)
 {
-  struct list_elem *e;
   struct thread *t;
-  enum intr_level old_level;
+  struct list_elem *cur = list_begin (&sleep_list), *next;
 
-  ASSERT (!intr_context ());
-  old_level = intr_disable();
+   if (list_empty (&sleep_list))
+     return;
 
-  for(e = list_begin(&sleep_list); e != list_end(&sleep_list); ){
-    t = list_entry(e, struct thread, elem);
-    if(t->time_to_wake <= ticks){
-      e = list_next(e);
-      list_remove(e->prev);
-      thread_unblock(t);
-    } else break; // n haverá mais threads para acordar
-  }
-  intr_set_level(old_level);
-}
+   while (cur != list_end (&sleep_list))
+     {
+       next = list_next (cur);
+       t = list_entry (cur, struct thread, elem);
+      if (t->time_to_wake > timer_ticks())
+         break;
 
-bool ordenador(const struct list_elem *a, const struct list_elem *b, void *aux)
-{
-
-  struct thread *thread1 = list_entry(a, struct thread, elem);
-  struct thread *thread2 = list_entry(b, struct thread, elem);
-
-  return thread1->time_to_wake < thread2->time_to_wake;
-
+       // Remove the thread from timer_wait_list
+       // then unblock it
+       enum intr_level old_level;
+       old_level = intr_disable ();
+      list_remove (cur);
+             thread_unblock (t);
+       intr_set_level (old_level);
+       cur = next;
+     }
 }
 
 /* Invoke function 'func' on alSl threads, passing along 'aux'.
