@@ -7,12 +7,10 @@
 
 #define Q_FP 1<<14
 
-int convert_to_fp(int x);
-int add_fp(int x, int y);
-int multiply_fp(int x, int y);
-int divide_fp(int x, int y);
-int convert_to_int(int x);
-int convert_to_int_round(int x);
+int convert_float(int x);
+int mult_float(int x, int y);
+int div_float(int x, int y);
+int nearest_int_round(int x);
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -155,20 +153,19 @@ int thread_get_load_avg (void);
 void update_load_avg(void);
 
 void update_recent_cpu(struct thread *t, void *aux);
-void
-update_priority(struct thread*t, void *aux);
-void
-update_recent_cpu_and_priority(struct thread*t, void *aux);
+void update_priority(struct thread*t, void *aux);
+void update_recent_cpu_priority(struct thread*t, void *aux);
 
 void increment_recent_cpu(struct thread *t);
 
-bool ordenado_prioridade(const struct list_elem *a,
+bool ordenado_prioridade_maiorigual(const struct list_elem *a,
                                 const struct list_elem *b,
                                 void *aux);
 
 bool ordenado_prioridade_maior(const struct list_elem *a,
                                 const struct list_elem *b,
                                 void *aux);
+void sort_ready_list();
 
 
 #endif /* threads/thread.h */

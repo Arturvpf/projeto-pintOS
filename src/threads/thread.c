@@ -17,30 +17,30 @@
 #endif
 
 
-int convert_to_fp(int x)
+int convert_float(int x)
 {
-    return ((x)*(Q_FP));
+  return ((x)*(Q_FP));
 }
 
-int multiply_fp(int x, int y)
+int mult_float(int x, int y)
 {
-    return ((int64_t)(x)) * (y) / (Q_FP);
+  return ((int64_t)(x))*(y) / (Q_FP);
 }
 
-int divide_fp(int x, int y)
+int div_float(int x, int y)
 {
-    return ((int64_t)(x)) * (Q_FP) / (y);
+  return ((int64_t)(x))*(Q_FP) / (y);
 }
 
-int convert_to_int_round(int x)
+int nearest_int_round(int x)
 {
   if(x >= 0)
   {
-    return (x + ((Q_FP)/2))/(Q_FP);
+    return (x+((Q_FP)/2)) / (Q_FP);
   }
   else
   {
-    return (x - ((Q_FP)/2))/(Q_FP);
+    return (x-((Q_FP)/2)) / (Q_FP);
   }
 }
 
@@ -98,7 +98,7 @@ static void kernel_thread (thread_func *, void *aux);
 static void idle (void *aux UNUSED);
 static struct thread *running_thread (void);
 static struct thread *next_thread_to_run (void);
-static void init_thread (struct thread *, const char *name, int priority);
+static void init_thread (struct thread *, const char *name, int priority, int nice);
 static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
@@ -133,7 +133,7 @@ thread_init (void)
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
-  init_thread (initial_thread, "main", PRI_DEFAULT);
+  init_thread (initial_thread, "main", PRI_DEFAULT, 0);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
 }
@@ -141,12 +141,12 @@ thread_init (void)
 void 
 init_load(void)
 {
-  load_avg = convert_to_fp(0);
+  load_avg = convert_float(0);
 }
 void 
 update_priority (struct thread *t, void *aux)
 {
-  t->priority = PRI_MAX - convert_to_int_round(t->recent_cpu / 4) - (t->nice/2);
+  t->priority = PRI_MAX - nearest_int_round(t->recent_cpu / 4) - (t->nice*2);
   if (t->priority < PRI_MIN)
     t->priority = PRI_MIN;
   else if (t->priority > PRI_MAX)
@@ -156,7 +156,7 @@ update_priority (struct thread *t, void *aux)
 void 
 update_recent_cpu (struct thread *t, void *aux)
 {
-  t->recent_cpu = multiply_fp(divide_fp(2*load_avg, 2*load_avg + convert_to_fp(1)), t->recent_cpu) + convert_to_fp(t->nice);
+  t->recent_cpu = mult_float(div_float(2*load_avg, (2*load_avg + convert_float(1))), t->recent_cpu) + convert_float(t->nice);
 }
 
 void 
@@ -164,14 +164,14 @@ increment_recent_cpu(struct thread *t)
 {
   if(t != idle_thread)
   {
-    t->recent_cpu = t->recent_cpu + convert_to_fp(1);
+    t->recent_cpu = t->recent_cpu + convert_float(1);
   }
 }
 void
-update_recent_cpu_and_priority(struct thread*t, void *aux)
+update_recent_cpu_priority(struct thread*t, void *aux)
 {
   update_recent_cpu(t, aux);
-  t->priority = PRI_MAX - convert_to_int_round(t->recent_cpu / 4) - (t->nice/2);
+  t->priority = PRI_MAX - nearest_int_round(t->recent_cpu / 4) - (t->nice*2);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -254,7 +254,11 @@ thread_create (const char *name, int priority,
     return TID_ERROR;
 
   /* Initialize thread. */
-  init_thread (t, name, priority);
+  
+  if(thread_mlfqs)
+  {
+    init_thread (t, name, PRI_MAX, 0);
+  }else init_thread (t, name, priority, 0);
   tid = t->tid = allocate_tid ();
 
   /* Stack frame for kernel_thread(). */
@@ -274,6 +278,11 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+
+  if(t->priority > thread_current()->priority)
+  {
+    thread_yield();
+  }
 
   return tid;
 }
@@ -311,7 +320,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered (&ready_list, &t->elem, ordenado_prioridade_maior, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -370,6 +379,21 @@ thread_exit (void)
   NOT_REACHED ();
 }
 
+bool ordenado_prioridade_maiorigual (const struct list_elem *a, const struct list_elem *b, void *aux) {
+
+  int64_t prioridade_a = list_entry (a, struct thread, elem)->priority;
+  int64_t prioridade_b = list_entry (b, struct thread, elem)->priority;
+  return prioridade_a >= prioridade_b ? true : false;
+}
+
+bool ordenado_prioridade_maior (const struct list_elem *a, const struct list_elem *b, void *aux) {
+
+  int64_t prioridade_a = list_entry (a, struct thread, elem)->priority;
+  int64_t prioridade_b = list_entry (b, struct thread, elem)->priority;
+  return prioridade_a > prioridade_b ? true : false;
+}
+
+
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
 void
@@ -384,9 +408,9 @@ thread_yield (void)
   if (cur != idle_thread){ 
     
     if(thread_mlfqs){
-      list_insert_ordered(&ready_list, &cur->elem, ordenado_prioridade, NULL);
+      list_insert_ordered(&ready_list, &cur->elem, ordenado_prioridade_maiorigual, NULL); // coloca na mfq fila de prontos, se prioridades iguais, usa round-robin
     } else{
-      list_insert_ordered(&ready_list, &cur->elem, ordenado_prioridade_maior, NULL);
+      list_insert_ordered(&ready_list, &cur->elem, ordenado_prioridade_maior, NULL); //coloca na fila de prioridade
     }  
   }
   cur->status = THREAD_READY;
@@ -403,19 +427,6 @@ static bool ordenado (const struct list_elem *a, const struct list_elem *b, void
   struct thread *thread_a = list_entry (a, struct thread, elem);
   struct thread *thread_b = list_entry (b, struct thread, elem);
   return thread_a->time_to_wake < thread_b->time_to_wake;
-}
-bool ordenado_prioridade (const struct list_elem *a, const struct list_elem *b, void *aux) {
-
-  int64_t prioridade_a = list_entry (a, struct thread, elem)->priority;
-  int64_t prioridade_b = list_entry (b, struct thread, elem)->priority;
-  return prioridade_a >= prioridade_b ? true : false;
-}
-
-bool ordenado_prioridade_maior (const struct list_elem *a, const struct list_elem *b, void *aux) {
-
-  int64_t prioridade_a = list_entry (a, struct thread, elem)->priority;
-  int64_t prioridade_b = list_entry (b, struct thread, elem)->priority;
-  return prioridade_a > prioridade_b ? true : false;
 }
 /* 
   Adicionada: Funcao poe as threads para dormir 
@@ -479,7 +490,7 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
-/* Sets the current thread's priority to NEW_PRIORITY. */
+/* seta a thhread atual para nova prioridade. */
 void
 thread_set_priority (int new_priority) 
 {
@@ -497,16 +508,14 @@ thread_set_priority (int new_priority)
   }
 }
 
-/* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
   return thread_current ()->priority;
 }
 
-/* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int nice ) 
 {
   thread_current()->nice = nice;
   struct thread * t = thread_current();
@@ -521,7 +530,6 @@ thread_set_nice (int nice UNUSED)
   }
 }
 
-/* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
@@ -529,16 +537,16 @@ thread_get_nice (void)
   return t->nice;
 }
 
-/* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  return convert_to_int_round(load_avg * 100);
+  return nearest_int_round(load_avg * 100);
 }
 
-void update_load_avg()
+void
+update_load_avg()
 {
-  load_avg = multiply_fp(convert_to_fp(59)/60, load_avg) + (convert_to_fp(1)/60) 
+  load_avg = mult_float(convert_float(59)/60, load_avg) + (convert_float(1)/60) 
   * (thread_current() == idle_thread ? list_size(&ready_list): list_size(&ready_list) + 1);
 }
 
@@ -546,7 +554,7 @@ void update_load_avg()
 int
 thread_get_recent_cpu (void) 
 {
-  return convert_to_int_round(thread_current()->recent_cpu * 100);
+  return nearest_int_round(thread_current()->recent_cpu * 100);
 }
 
 void sort_ready_list()
@@ -627,7 +635,7 @@ is_thread (struct thread *t)
 /* Does basic initialization of T as a blocked thread named
    NAME. */
 static void
-init_thread (struct thread *t, const char *name, int priority)
+init_thread (struct thread *t, const char *name, int priority, int nice)
 {
   enum intr_level old_level;
 
@@ -640,6 +648,8 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->nice = nice;
+  t->recent_cpu = 0;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
