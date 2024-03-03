@@ -5,22 +5,14 @@
 #include <list.h>
 #include <stdint.h>
 
-#define FLOAT_SHIFT_AMOUNT 17
-#define F mypow(14)
-#define Q 14
-int mypow(int p);
-typedef int float_type;
-#define FLOAT_CONST(A) ((float_type)(A * F))
-#define FLOAT_ADD(A,B) (A + B)
-#define FLOAT_ADD_MIX(A,B) (A + (B * F))
-#define FLOAT_SUB(A,B) (A - B)
-#define FLOAT_SUB_MIX(A,B) (A - (B * F))
-#define FLOAT_MULT_MIX(A,B) (A * B)
-#define FLOAT_DIV_MIX(A,B) (A / B)
-#define FLOAT_MULT(A,B) ((float_type)(((int64_t) A)* B / F))
-#define FLOAT_DIV(A,B) ((float_type)((((int64_t) A) * F) / B))
-#define FLOAT_INT_PART(A) (A >> FLOAT_SHIFT_AMOUNT)
-#define FLOAT_ROUND(A) (A >= 0 ? ((A + (1 * mypow(Q - 1))) / F) : ((A - (1 * mypow(Q - 1)))/F))
+#define Q_FP 1<<14
+
+int convert_to_fp(int x);
+int add_fp(int x, int y);
+int multiply_fp(int x, int y);
+int divide_fp(int x, int y);
+int convert_to_int(int x);
+int convert_to_int_round(int x);
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -105,8 +97,8 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    //int nice;                           /* Thread Niceness*/
-    //int recent_cpu;                     /* CPU recente */
+    int nice;                           /* Thread Niceness*/
+    int recent_cpu;                     /* CPU recente */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -156,38 +148,27 @@ void thread_foreach (thread_action_func *, void *);
 int thread_get_priority (void);
 void thread_set_priority (int);
 
-//thread_action_func update_recent_cpu;
-//thread_action_func update_priority;
-//thread_action_func update_recent_cpu_and_priority;
-
 int thread_get_nice (void);
-void thread_set_nice (int);
+void thread_set_nice (int nice UNUSED);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+void update_load_avg(void);
 
-//ADDED:
+void update_recent_cpu(struct thread *t, void *aux);
+void
+update_priority(struct thread*t, void *aux);
+void
+update_recent_cpu_and_priority(struct thread*t, void *aux);
 
-/*udpate system load_avg*/
-//void update_load_avg();
+void increment_recent_cpu(struct thread *t);
 
-/*update recent cpu */
-//void update_recent_cpu(struct thread* t, void *aux);
-
-/* increment recent cpu */
-//void increment_recent_cpu(struct thread* t);
-
-
-/*bool sort_priority_list_less_func(const struct list_elem *a,
+bool ordenado_prioridade(const struct list_elem *a,
                                 const struct list_elem *b,
                                 void *aux);
 
-bool sort_priority_list_after_func(const struct list_elem *a,
+bool ordenado_prioridade_maior(const struct list_elem *a,
                                 const struct list_elem *b,
                                 void *aux);
-*/
-//void sort_ready_list();   
-
-//void updateCurrThread();
 
 
 #endif /* threads/thread.h */

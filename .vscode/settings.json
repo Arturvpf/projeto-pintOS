@@ -2,6 +2,8 @@
     "editor.formatOnSave": true,
     "C_Cpp.formatting": "clangFormat",
     "files.associations": {
-        "palloc.h": "c"
+        "palloc.h": "c",
+        "flags.h": "c",
+        "stdint.h": "c"
     },
 }
