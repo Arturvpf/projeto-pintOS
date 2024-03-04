@@ -45,6 +45,7 @@ int nearest_int_round(int x)
 }
 
 
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -490,13 +491,13 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
-/* seta a thhread atual para nova prioridade. */
+/* seta a thread atual para nova prioridade. */
 void
-thread_set_priority (int new_priority) 
+thread_set_priority (int nova_pri) 
 {
   if(!thread_mlfqs)
   {
-    thread_current ()->priority = new_priority;
+    thread_current ()->priority = nova_pri;
     if(!list_empty(&ready_list))
     {
       struct thread *e = list_entry(list_front(&ready_list), struct thread, elem);
