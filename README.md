@@ -4,7 +4,7 @@
 ### Team
 Team composed by:
 - Ariel Sharon Vieira de Lima (asvl)
-- Artur Vinicius Pereira Fernandes (avpf)
+- Artur Vinicius Pereira Fernandes (arturvpf)
 - João Victor da Silva Nascimento (jvsn2)
 
 ### Overview
